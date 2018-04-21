@@ -1,6 +1,8 @@
 import pyphone
 from levenshtein import levenshtein
 from collections import namedtuple
+import operator
+from functools import reduce
 
 
 Result = namedtuple('Result', ['id', 'term', 'score'])
@@ -36,9 +38,9 @@ class FastFuzzySearch:
         n_results
         """
         query_words = query.split(' ')
-        res_sets = map(query_words, self.ids_for_query_word)
+        res_sets = map(self.ids_for_query_word, query_words)
         common_ids = set.intersection(*res_sets)
-        candidates = map(common_ids, lambda id: self.score_for_id(id, query))
+        candidates = map(lambda id: self.score_for_id(id, query), common_ids)
         ranked_candidates = sorted(candidates, key=lambda res: res.score)
         return ranked_candidates[:n_results]
 
@@ -59,17 +61,28 @@ class FastFuzzySearch:
         res = []
         phonexes = pyphone.phonex(word, language=self.options['language'])
         for phonex in phonexes:
-            res.append(phonex)
-            for i in range(len(phonex)):
-                res.append(phonex[:i] + phonex[i + 1:])
+            one_delete = self.deletes(phonex)
+            # Flatten
+            two_deletes = reduce(operator.add, map(self.deletes, one_delete))
+            res += [phonex]
+            res += one_delete
+            res += two_deletes
+
+        return res
+
+    @staticmethod
+    def deletes(term):
+        res = []
+        for i in range(len(term)):
+            res.append(term[:i] + term[i + 1:])
         return res
 
     def score_for_id(self, id, query):
         """
         Given a termId, returns the scored Result object
         """
-        term = self.index.get(id)
-        score = levenshtein(query, term, align=True)
+        term = self.library.get(id)
+        score = levenshtein(term.lower(), query.lower())
         return Result(id, term, score)
 
     def ids_for_query_word(self, query_word):
@@ -77,5 +90,10 @@ class FastFuzzySearch:
         Returns a set of all ids that match this query_word
         """
         variants = self.generate_phonetic_variants(query_word)
-        res_sets = map(lambda variant: self.index.get(variant), variants)
-        return set.union(filter(None.__ne__, res_sets))
+        res_sets = list(filter(
+            None.__ne__,
+            map(lambda variant: self.index.get(variant), variants)))
+        if len(res_sets) > 0:
+            return set.union(*res_sets)
+        else:
+            return set()
