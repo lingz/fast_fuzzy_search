@@ -1,5 +1,9 @@
 # Fast Fuzzy Search
 
+```
+pip install fast_fuzzy_search
+```
+
 A fast fuzzy search algorithm implemented in Python.
 
 Uses Phonex (Phonetic Indexing) to quickly find similar sounding words.

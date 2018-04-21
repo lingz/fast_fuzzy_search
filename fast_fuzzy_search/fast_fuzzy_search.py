@@ -1,5 +1,5 @@
 import pyphone
-from levenshtein import levenshtein
+from fast_fuzzy_search.levenshtein import levenshtein
 from collections import namedtuple
 import operator
 from functools import reduce
